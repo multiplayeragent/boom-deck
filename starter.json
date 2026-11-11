@@ -1,0 +1,21 @@
+{
+  "name": "Boom Deck",
+  "genre": "party",
+  "dim": "2D",
+  "mode": "Turn-based",
+  "players": "2–6",
+  "hook": "Draw a card. Pray it isn't a Boom.",
+  "how": "Play action cards, then draw one to end your turn. Draw a Boom and you're out, unless you have a Defuse: then you secretly slip the Boom back into the deck. Peek, Skip, Attack, Shuffle and Steal to dodge it. Last one standing wins.",
+  "controls": "Click or tap a card to play it, tap the deck to draw",
+  "uses": [
+    ["Hidden info", "Your hand, your peeks and where you hide a Boom are sealed so only you can read them (the host deals, so it can too)."],
+    ["Host-run rules", "The host's browser shuffles, deals and checks every card; if it leaves, the next player takes over."],
+    ["Bots", "Bots fill empty seats, peek, steal and dodge, and take over for anyone who leaves."],
+    ["Leaderboard", "Games won, shown after every game."]
+  ],
+  "ideas": [
+    "Add a Reverse card that changes the turn order",
+    "Put two Booms in the deck for every player",
+    "Make it a pirate ship with powder kegs instead of bombs"
+  ]
+}
