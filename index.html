@@ -49,6 +49,7 @@
   #deck .lbl, #pile .lbl { position: absolute; bottom: -24px; left: -20px; right: -20px; text-align: center; font-size: 12px; font-weight: 700; opacity: .85; white-space: nowrap; }
   #danger { position: absolute; left: 50%; top: calc(44% + var(--ch) * .5 + 10px); transform: translateX(-50%); font-size: 13px; font-weight: 800; padding: 3px 12px; border-radius: 999px;
             background: #0007; white-space: nowrap; pointer-events: none; }
+  #danger:empty { display: none; }
   #danger i { display: inline-block; width: 70px; height: 6px; border-radius: 3px; background: #ffffff22; vertical-align: 2px; margin-left: 6px; overflow: hidden; }
   #danger i b { display: block; height: 100%; background: linear-gradient(90deg, #ffd166, #ff3d3d); }
   /* ── my hand and status ── */
@@ -63,9 +64,9 @@
   #timer i { display: block; height: 100%; background: var(--gold); transform-origin: left; }
   #hint { position: absolute; left: 50%; top: calc(44% - var(--ch) * .5 - 44px); transform: translateX(-50%); background: #000a; padding: 7px 14px; border-radius: 999px; font-size: 13px;
           white-space: nowrap; pointer-events: none; transition: opacity .5s; z-index: 5; }
-  #toast { position: absolute; left: 50%; bottom: calc(max(8px, env(safe-area-inset-bottom)) + var(--ch) + 100px); transform: translateX(-50%); background: #000c; padding: 6px 14px;
+  #toast { position: absolute; left: 50%; top: calc(44% - var(--ch) * .5 - 44px); /* where the hint was: clear of the Boom meter */ transform: translateX(-50%); background: #000c; padding: 6px 14px;
            border-radius: 999px; font-size: 13px; font-weight: 700; pointer-events: none; opacity: 0; transition: opacity .25s; white-space: nowrap; z-index: 6; }
-  #cancel { position: absolute; left: 50%; bottom: calc(max(8px, env(safe-area-inset-bottom)) + var(--ch) + 90px); transform: translateX(-50%); min-height: 44px; padding: 0 20px; border-radius: 22px; border: 0;
+  #cancel { position: absolute; left: 50%; top: calc(44% - var(--ch) * .5 - 52px); transform: translateX(-50%); min-height: 44px; padding: 0 20px; border-radius: 22px; border: 0;
             background: #ffffff26; color: #fff; font: 700 14px system-ui, sans-serif; cursor: pointer; z-index: 7; }
   #net { position: fixed; bottom: max(4px, env(safe-area-inset-bottom)); left: 0; right: 0; text-align: center; font-size: 12px; opacity: .7; pointer-events: none; }
   /* ── overlays ── */
@@ -74,6 +75,7 @@
   .box { box-sizing: border-box; width: min(380px, calc(100vw - 32px)); max-height: 88vh; overflow: auto; padding: 18px; border-radius: 18px; background: #1d1640; border: 1px solid #ffffff22; text-align: center; }
   .box h2 { margin: 0 0 4px; font-size: 24px; } .box p { margin: 0 0 12px; opacity: .85; }
   .box h3 { margin: 6px 0 4px; font-size: 13px; color: var(--gold); text-align: left; }
+  .box li.note { list-style: none; margin-left: -24px; opacity: .8; } /* a message in place of the list: no "1." in front of it */
   .box ol { text-align: left; margin: 0 0 12px; padding-left: 24px; font-size: 14px; min-height: 30px; } .box li span { float: right; }
   .box button { width: 100%; min-height: 48px; border: 0; border-radius: 12px; background: var(--gold); color: #2a1d00; font: 800 16px system-ui, sans-serif; cursor: pointer; }
   #peekCards { display: flex; justify-content: center; gap: 10px; margin: 6px 0 14px; --cw: 76px; }
@@ -95,7 +97,7 @@
   <div id="mid"><div id="deck"></div><div id="pile"></div></div>
   <div id="danger"></div>
   <div id="hint">Play cards, then tap the deck to draw. Don't draw a 💣!</div>
-  <div id="me"><span id="meText"></span><div id="timer"><i></i></div></div>
+  <div id="me"><span id="meText"></span><div id="timer" style="visibility: hidden"><i></i></div></div>
   <div id="toast"></div>
   <button id="cancel" hidden>Cancel</button>
   <div id="hand"></div>
@@ -107,7 +109,7 @@
   <div id="placeBtns"><button data-p="0">On top</button><button data-p="1">2nd from top</button><button data-p="2">3rd from top</button><button data-p="b">At the bottom</button><button data-p="r">Anywhere (random)</button></div></div></div>
 <div id="over" hidden><div class="box">
   <h2 id="overTitle"></h2><p id="overSub"></p>
-  <h3>Most wins</h3><ol id="board"><li>Loading…</li></ol>
+  <h3>Most wins</h3><ol id="board"><li class="note">Loading…</li></ol>
   <button id="again">Play again</button>
 </div></div>
 <script>
@@ -560,7 +562,7 @@ function tapCard(card, el) {
   if (!g || ATTRACT) return;
   if (!myTurn(g) || g.ph !== "play") { shakeEl(el); if (g.ph === "play" && g.turn >= 0) toast("Wait for your turn"); return; }
   if (card === "D") { shakeEl(el); toast("A Defuse saves you when you draw a Boom"); return; }
-  if (card === "T") { stealing = stealing ? null : { g: g.id, t: g.t }; if (stealing) toast("Tap a player to steal from"); return; }
+  if (card === "T") { stealing = stealing ? null : { g: g.id, t: g.t }; hintUntil = toastUntil = 0; return; } // the status line says "Steal from who?"
   playMine(card, el);
 }
 function playMine(card, el, to) {
@@ -609,7 +611,7 @@ function drawSeats(g) {
   if (key !== seatKey) {
     seatKey = key;
     $("opps").innerHTML = order.map((i) => { const s = g.seats[i]; return `<div class="seat" data-i="${i}"><div class="av" style="--c:${esc(seatColor(s))}">${esc((seatName(s)[0] || "?").toUpperCase())}</div><div class="nm">${esc(seatName(s))}${s.b ? " 🤖" : ""}</div><div class="fan"></div><span class="cnt"></span></div>`; }).join("");
-    for (const el of $("opps").children) el.onpointerdown = (e) => { e.preventDefault(); tapSeat(+el.dataset.i); };
+    for (const el of $("opps").children) el.onpointerdown = (e) => { e.preventDefault(); if (e.button === 0) tapSeat(+el.dataset.i); };
   }
   for (const el of $("opps").children) {
     const i = +el.dataset.i, count = g.counts[i], turn = g.ph !== "over" && g.turn === i;
@@ -661,7 +663,7 @@ function drawHand(g) {
     el.style.left = x0 + k * stepX + "px";
     el.style.transform = `translateY(${Math.abs(mid) * Math.abs(mid) * 0.9 - (ok ? 12 : 0) - (stealing && c === "T" ? 14 : 0)}px) rotate(${mid * Math.min(3.5, 30 / Math.max(1, n))}deg)`;
     el.classList.toggle("ok", ok); el.classList.toggle("dim", mine && !ok); el.classList.toggle("new", isNew);
-    el.onpointerdown = (e) => { e.preventDefault(); tapCard(c, el); };
+    el.onpointerdown = (e) => { e.preventDefault(); if (e.button === 0) tapCard(c, el); }; // the main button or a finger only
     box.appendChild(el);
   });
 }
@@ -691,7 +693,7 @@ function status(g) {
   const netText = ATTRACT ? "" : net.offline ? "Offline: playing with bots" : dropped ? "Reconnecting…" : `Online · ${np} player${np === 1 ? "" : "s"}${isHost() ? " · you run the table" : ""}`;
   if ($("net").textContent !== netText) $("net").textContent = netText;
 }
-function toast(text) { $("toast").textContent = text; toastUntil = performance.now() + 1800; }
+function toast(text) { $("toast").textContent = text; toastUntil = performance.now() + 1800; hintUntil = 0; }
 /** Where a seat is on screen (my seat = my hand). */
 function seatPoint(g, i) {
   const el = i === seatOf(g, net.sessionId) ? $("hand") : $("opps").querySelector(`[data-i="${i}"] .av`);
@@ -781,14 +783,15 @@ function results(g) {
   $("overSub").textContent = `${g.seats.length - 1} Boom${g.seats.length > 2 ? "s" : ""} went off. The last one standing wins.`;
   $("again").hidden = mine < 0;
   const list = $("board");
-  if (!board) { list.innerHTML = "<li>Leaderboards need a connection.</li>"; return; }
-  list.innerHTML = "<li>Loading…</li>";
+  if (!board) { list.innerHTML = '<li class="note">Leaderboards need a connection.</li>'; return; }
+  list.innerHTML = '<li class="note">Loading…</li>';
   (won ? board.submit(1, "inc").catch(() => null) : Promise.resolve()).then(() => board.top(10)).then(({ entries }) => {
-    list.innerHTML = entries.length ? entries.map((e) => `<li>${esc(e.username || "Player")}<span>${e.score}</span></li>`).join("") : "<li>No wins yet. Be the first.</li>";
-  }).catch(() => { list.innerHTML = "<li>Couldn't load the leaderboard.</li>"; });
+    list.innerHTML = entries.length ? entries.map((e) => `<li>${esc(e.username || "Player")}<span>${e.score}</span></li>`).join("") : '<li class="note">No wins yet. Be the first.</li>';
+  }).catch(() => { list.innerHTML = `<li class="note">Couldn't load the leaderboard.</li>`; });
 }
 $("again").onclick = () => { const g = game(); if (g && g.ph === "over") act("again", {}); };
-$("deck").onpointerdown = (e) => { e.preventDefault(); tapDeck(); };
+$("deck").onpointerdown = (e) => { e.preventDefault(); if (e.button === 0) tapDeck(); };
+addEventListener("contextmenu", (e) => e.preventDefault()); // a right-click on the table opens no browser menu
 $("cancel").onclick = () => { stealing = null; };
 $("peekOk").onclick = () => { $("peek").hidden = true; };
 for (const b of $("placeBtns").querySelectorAll("button")) b.onclick = () => placeMine(b.dataset.p);
