@@ -86,7 +86,7 @@
   .pop { position: fixed; z-index: 21; pointer-events: none; font-weight: 900; font-size: 32px; text-shadow: 0 3px 0 #0008; animation: pop 1.2s ease-out forwards; white-space: nowrap; }
   @keyframes pop { 0% { transform: translate(-50%, -50%) scale(.4); opacity: 0; } 20% { transform: translate(-50%, -50%) scale(1.15); opacity: 1; } 100% { transform: translate(-50%, -120%) scale(1); opacity: 0; } }
   .shk { animation: shk .35s; } @keyframes shk { 25% { margin-left: -6px; } 75% { margin-left: 6px; } }
-  #fx { position: fixed; inset: 0; pointer-events: none; z-index: 35; }
+  #fx { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 35; } /* sized by CSS: the drawing buffer is devicePixelRatio times bigger */
   .attract #hint, .attract #toast, .attract #net, .attract #me { display: none; }
 </style>
 <script src="https://cdn.multiplayeragent.com/sdk/mp.global.js"></script>
@@ -418,7 +418,7 @@ function handle({ type, from, data: d }) {
   const i = seatOf(g, from);
   if (type === "again") return g.ph === "over" && i >= 0 ? deal(g) : undefined;
   if (i !== g.turn || d.t !== g.t) return;
-  if (type === "place" && g.ph === "defuse") return commit(placeBoom(g, i, String(d.pos)));
+  if (type === "place" && g.ph === "defuse") return ["0", "1", "2", "b", "r"].includes(String(d.pos)) ? commit(placeBoom(g, i, String(d.pos))) : undefined;
   if (g.ph !== "play") return;
   if (type === "play") return commit(playAction(g, i, String(d.c), Number(d.to)));
   if (type === "draw") return commit(drawCard(g, i));
@@ -442,8 +442,15 @@ function adoptTable(g, now) {
   const missing = g.seats.some((s, i) => !s.b && !g.out[i] && stillHere(s.i) && !host.known.has(i));
   if (missing && now - host.since < CONFIG.rejoinMs) return;
   const mix = deckMix(g.seats.length), all = Object.keys(mix).flatMap((c) => repeat(c, mix[c] - (g.used[c] || 0)));
-  const held = g.seats.map((s, i) => { const h = host.known.get(i); return h && h.length === g.counts[i] ? h.slice() : null; });
-  let pool = shuffle(without(all, held.filter(Boolean).flat()));
+  let left = all.slice(); // a re-sent hand is kept only if every card in it is still unaccounted for (no made-up or extra cards)
+  const held = g.seats.map((s, i) => {
+    const h = host.known.get(i);
+    if (!Array.isArray(h) || h.length !== g.counts[i] || h.some((c) => typeof c !== "string" || !"DPKAHT".includes(c) || c.length !== 1)) return null;
+    const rest = without(left, h);
+    if (rest.length !== left.length - h.length) return null;
+    left = rest; return h.slice();
+  });
+  let pool = shuffle(left);
   const booms = pool.filter((c) => c === "B");
   pool = pool.filter((c) => c !== "B");
   host.hands = held.map((h, i) => h || pool.splice(-g.counts[i])); // bots (and anyone silent) get fresh cards
